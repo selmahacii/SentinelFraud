@@ -1,0 +1,166 @@
+# =============================================================================
+# SENTINEL-FRAUD: Prometheus Alerting Rules
+# =============================================================================
+# Alert rules for fraud detection service monitoring
+# =============================================================================
+
+groups:
+  # ===========================================================================
+  # Fraud Detection Alerts
+  # ===========================================================================
+  - name: fraud_detection_alerts
+    interval: 30s
+    rules:
+      # High fraud rate alert
+      - alert: HighFraudRate
+        expr: sentinel_fraud_rate > 0.01
+        for: 5m
+        labels:
+          severity: warning
+          category: fraud
+        annotations:
+          summary: "High fraud detection rate"
+          description: "Fraud rate is {{ $value | humanizePercentage }} which is above the 1% threshold"
+          runbook_url: "https://runbooks.sentinel.fraud/high-fraud-rate"
+
+      # Critical fraud spike
+      - alert: FraudSpike
+        expr: rate(sentinel_fraud_score_total{risk_level="CRITICAL"}[5m]) > 10
+        for: 2m
+        labels:
+          severity: critical
+          category: fraud
+        annotations:
+          summary: "Critical fraud spike detected"
+          description: "{{ $value }} critical fraud alerts per second"
+          runbook_url: "https://runbooks.sentinel.fraud/fraud-spike"
+
+      # High-value fraud detection
+      - alert: HighValueFraudDetected
+        expr: increase(sentinel_high_value_fraud_total[1h]) > 5
+        for: 1m
+        labels:
+          severity: warning
+          category: fraud
+        annotations:
+          summary: "Multiple high-value frauds detected"
+          description: "{{ $value }} high-value fraud transactions in the last hour"
+
+  # ===========================================================================
+  # Performance Alerts
+  # ===========================================================================
+  - name: performance_alerts
+    interval: 30s
+    rules:
+      # Latency SLA breach
+      - alert: LatencySLABreach
+        expr: histogram_quantile(0.95, rate(sentinel_fraud_score_duration_seconds_bucket[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          category: performance
+        annotations:
+          summary: "Latency SLA breach"
+          description: "P95 latency is {{ $value | humanizeDuration }}, exceeding 50ms target"
+          runbook_url: "https://runbooks.sentinel.fraud/latency-breach"
+
+      # High request rate
+      - alert: HighRequestRate
+        expr: rate(sentinel_http_requests_total[5m]) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "High request rate"
+          description: "Processing {{ $value }} requests per second"
+
+      # Error rate spike
+      - alert: ErrorRateSpike
+        expr: rate(sentinel_http_requests_total{status_code=~"5.."}[5m]) / rate(sentinel_http_requests_total[5m]) > 0.01
+        for: 2m
+        labels:
+          severity: critical
+          category: errors
+        annotations:
+          summary: "High error rate"
+          description: "Error rate is {{ $value | humanizePercentage }}"
+
+  # ===========================================================================
+  # Model Health Alerts
+  # ===========================================================================
+  - name: model_health_alerts
+    interval: 30s
+    rules:
+      # Circuit breaker open
+      - alert: CircuitBreakerOpen
+        expr: sentinel_circuit_breaker_state == 1
+        for: 1m
+        labels:
+          severity: critical
+          category: model
+        annotations:
+          summary: "Circuit breaker is open"
+          description: "ML model circuit breaker has opened, falling back to rules"
+          runbook_url: "https://runbooks.sentinel.fraud/circuit-breaker"
+
+      # Model prediction failures
+      - alert: ModelPredictionFailures
+        expr: rate(sentinel_model_predictions_total{status="error"}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          category: model
+        annotations:
+          summary: "Model prediction failures"
+          description: "{{ $value }} model prediction errors per second"
+
+      # Fallback mode active
+      - alert: FallbackModeActive
+        expr: rate(sentinel_fraud_score_total{model_used="rules_fallback"}[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          category: model
+        annotations:
+          summary: "Fallback mode is active"
+          description: "System is using rule-based fallback instead of ML model"
+
+  # ===========================================================================
+  # Infrastructure Alerts
+  # ===========================================================================
+  - name: infrastructure_alerts
+    interval: 30s
+    rules:
+      # Redis connection issues
+      - alert: RedisConnectionIssues
+        expr: sentinel_feature_store_operations_total{status="error"} > 10
+        for: 2m
+        labels:
+          severity: critical
+          category: infrastructure
+        annotations:
+          summary: "Redis connection issues"
+          description: "{{ $value }} Redis operation failures"
+
+      # Kafka consumer lag
+      - alert: KafkaConsumerLag
+        expr: sentinel_kafka_consumer_lag > 10000
+        for: 5m
+        labels:
+          severity: warning
+          category: infrastructure
+        annotations:
+          summary: "Kafka consumer lag is high"
+          description: "Consumer lag is {{ $value }} messages"
+
+      # Service down
+      - alert: ServiceDown
+        expr: up{job="sentinel-inference"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: infrastructure
+        annotations:
+          summary: "Inference service is down"
+          description: "The fraud inference service is not responding"

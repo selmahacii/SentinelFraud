@@ -1,0 +1,30 @@
+# =============================================================================
+# SENTINEL-FRAUD: Grafana Datasource Configuration
+# =============================================================================
+
+apiVersion: 1
+
+datasources:
+  # Prometheus
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: "15s"
+      httpMethod: POST
+      manageAlerts: true
+      prometheusType: Prometheus
+
+  # Redis
+  - name: Redis
+    type: redis-datasource
+    access: proxy
+    url: redis://redis:6379
+    editable: false
+    jsonData:
+      client: standalone
+      poolSize: 5
+      timeout: 10
